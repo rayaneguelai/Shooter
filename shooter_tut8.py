@@ -1,25 +1,29 @@
-import pygame
+import pygame, sys
 import os
 import random
-
+from pygame.constants import BIG_ENDIAN
+import pytmx
+import pyscroll
 pygame.init()
 
 
-SCREEN_WIDTH = 800
-SCREEN_HEIGHT = int(SCREEN_WIDTH * 0.8)
 
+SCREEN_WIDTH = 1400
+SCREEN_HEIGHT = 1000
+
+background = pygame.image.load('stp.png')
 screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
-pygame.display.set_caption('Shooter')
+pygame.display.set_caption('Le jeux de la victoire qui va tout gagner stp faut quon gagne un jeu')
 
-#set framerate
+#pour pas que ton perso se teleporte
 clock = pygame.time.Clock()
-FPS = 60
+FPS = 120
 
-#define game variables
+#define la graviter perso qui retombe
 GRAVITY = 0.75
 TILE_SIZE = 40
 
-#define player action variables
+#action du perso variable
 moving_left = False
 moving_right = False
 shoot = False
@@ -27,12 +31,12 @@ grenade = False
 grenade_thrown = False
 
 
-#load images
-#bullet
+#toute mes image
+#munition
 bullet_img = pygame.image.load('img/icons/bullet.png').convert_alpha()
 #grenade
 grenade_img = pygame.image.load('img/icons/grenade.png').convert_alpha()
-#pick up boxes
+#boite mystere
 health_box_img = pygame.image.load('img/icons/health_box.png').convert_alpha()
 ammo_box_img = pygame.image.load('img/icons/ammo_box.png').convert_alpha()
 grenade_box_img = pygame.image.load('img/icons/grenade_box.png').convert_alpha()
@@ -43,11 +47,12 @@ item_boxes = {
 }
 
 
-#define colours
-BG = (144, 201, 120)
+
+#couleur
+BG = (247, 246, 246 )
 RED = (255, 0, 0)
-WHITE = (255, 255, 255)
-GREEN = (0, 255, 0)
+WHITE = (0, 0, 0 )
+GREEN = (51, 229, 19 )
 BLACK = (0, 0, 0)
 
 #define font
@@ -60,7 +65,6 @@ def draw_text(text, font, text_col, x, y):
 
 def draw_bg():
 	screen.fill(BG)
-	pygame.draw.line(screen, RED, (0, 300), (SCREEN_WIDTH, 300))
 
 
 class Soldier(pygame.sprite.Sprite):
@@ -89,13 +93,13 @@ class Soldier(pygame.sprite.Sprite):
 		self.vision = pygame.Rect(0, 0, 150, 20)
 		self.idling = False
 		self.idling_counter = 0
-		
-		#load all images for the players
+
+		#Charger les images du joueur
 		animation_types = ['Idle', 'Run', 'Jump', 'Death']
 		for animation in animation_types:
-			#reset temporary list of images
+			#animation reset
 			temp_list = []
-			#count number of files in the folder
+			#compte le nombre de file avant le reset
 			num_of_frames = len(os.listdir(f'img/{self.char_type}/{animation}'))
 			for i in range(num_of_frames):
 				img = pygame.image.load(f'img/{self.char_type}/{animation}/{i}.png').convert_alpha()
@@ -107,6 +111,7 @@ class Soldier(pygame.sprite.Sprite):
 		self.rect = self.image.get_rect()
 		self.rect.center = (x, y)
 
+	def save_location(self): self.old_position = self.position.copy()
 
 	def update(self):
 		self.update_animation()
@@ -115,6 +120,11 @@ class Soldier(pygame.sprite.Sprite):
 		if self.shoot_cooldown > 0:
 			self.shoot_cooldown -= 1
 
+
+	def move_back(self):
+		self.position = self.old_position
+		self.rect.topleft = self.position
+		self.feet.midbottom = self.rect.midbottom
 
 	def move(self, moving_left, moving_right):
 		#reset movement variables
@@ -160,6 +170,7 @@ class Soldier(pygame.sprite.Sprite):
 			bullet_group.add(bullet)
 			#reduce ammo
 			self.ammo -= 1
+
 
 
 	def ai(self):
@@ -240,6 +251,64 @@ class Soldier(pygame.sprite.Sprite):
 		screen.blit(pygame.transform.flip(self.image, self.flip, False), self.rect)
 
 
+class Game:
+
+    def __init__(self):
+
+        self.screen = pygame.display.set_mode((800, 608))
+        pygame.display.set_caption("Je sais pas")
+
+
+        tmx_data = pytmx.util_pygame.load_pygame('carte.tmx')
+        map_data = pyscroll.data.TiledMapData(tmx_data)
+        map_layer = pyscroll.orthographic.BufferedRenderer(map_data, self.screen.get_size())
+
+
+
+
+        self.walls = []
+
+        for obj in tmx_data.objects:
+            if obj.type == "collision":
+                self.walls.append(pygame.Rect(obj.x, obj.y, obj.width, obj.height))
+
+        self.group = pyscroll.PyscrollGroup(map_layer=map_layer, default_layer=1)
+
+
+    def updatade(self):
+        self.group.update()
+
+        for sprite in self.group.sprites():
+            if sprite.feet.collidelist(self.walls) > -1:
+                sprite.move_back()
+
+
+
+    def run(self):
+
+        running = True
+
+        while running:
+
+            self.group.draw(self.screen)
+            self.group.update()
+
+
+            for event in pygame.event.get():
+                if event.type == pygame.QUIT:
+                    running = False
+
+        pygame.quit()
+
+
+    def updatade(self):
+        self.group.update()
+
+        for sprite in self.group.sprites():
+            if sprite.feet.collidelist(self.walls) > -1:
+                sprite.move_back()
+
+
 
 class ItemBox(pygame.sprite.Sprite):
 	def __init__(self, item_type, x, y):
@@ -286,7 +355,7 @@ class HealthBar():
 class Bullet(pygame.sprite.Sprite):
 	def __init__(self, x, y, direction):
 		pygame.sprite.Sprite.__init__(self)
-		self.speed = 10
+		self.speed = 5
 		self.image = bullet_img
 		self.rect = self.image.get_rect()
 		self.rect.center = (x, y)
@@ -409,14 +478,23 @@ item_box_group.add(item_box)
 
 
 
-player = Soldier('player', 200, 200, 1.65, 5, 20, 5)
+player = Soldier('player', 1200, 100, 1.65, 10, 20, 8)
 health_bar = HealthBar(10, 10, player.health, player.health)
 
-
-enemy = Soldier('enemy', 500, 200, 1.65, 2, 20, 0)
+enemy6 = Soldier('enemy', 900, 200, 1.65, 2, 20, 0)
+enemy5 = Soldier('enemy', 00, 200, 1.65, 2, 20, 0)
+enemy4 = Soldier('enemy', 800, 200, 1.65, 2, 20, 0)
+enemy3 = Soldier('enemy', 500, 200, 1.65, 2, 20, 0)
+enemy = Soldier('enemy', 700, 200, 1.65, 2, 20, 0)
 enemy2 = Soldier('enemy', 300, 200, 1.65, 2, 20, 0)
+
+
+enemy_group.add(enemy6)
 enemy_group.add(enemy)
 enemy_group.add(enemy2)
+enemy_group.add(enemy3)
+enemy_group.add(enemy4)
+enemy_group.add(enemy5)
 
 
 run = True
@@ -425,6 +503,8 @@ while run:
 	clock.tick(FPS)
 
 	draw_bg()
+
+	screen.blit(background, (0, 0))
 	#show player health
 	health_bar.draw(player.health)
 	#show ammo
@@ -484,13 +564,13 @@ while run:
 			run = False
 		#keyboard presses
 		if event.type == pygame.KEYDOWN:
-			if event.key == pygame.K_a:
+			if event.key == pygame.K_q:
 				moving_left = True
 			if event.key == pygame.K_d:
 				moving_right = True
 			if event.key == pygame.K_SPACE:
 				shoot = True
-			if event.key == pygame.K_q:
+			if event.key == pygame.K_a:
 				grenade = True
 			if event.key == pygame.K_w and player.alive:
 				player.jump = True
@@ -500,17 +580,18 @@ while run:
 
 		#keyboard button released
 		if event.type == pygame.KEYUP:
-			if event.key == pygame.K_a:
+			if event.key == pygame.K_q:
 				moving_left = False
 			if event.key == pygame.K_d:
 				moving_right = False
 			if event.key == pygame.K_SPACE:
 				shoot = False
-			if event.key == pygame.K_q:
+			if event.key == pygame.K_a:
 				grenade = False
 				grenade_thrown = False
+	
 
-
+	pygame.display.flip()
 	pygame.display.update()
 
 pygame.quit()
